@@ -2,7 +2,7 @@
 
 ## Publishing to JetBrains Marketplace
 
-This plugin uses GitHub Actions to automatically publish to the JetBrains Marketplace when you create a new release.
+This plugin uses GitHub Actions to automatically publish to the JetBrains Marketplace when you push a tag.
 
 ### Setup Instructions
 
