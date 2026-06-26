@@ -1,4 +1,4 @@
-  name: Publish to JetBrains Marketplace
+name: Publish to JetBrains Marketplace
 
 on:
   push:
