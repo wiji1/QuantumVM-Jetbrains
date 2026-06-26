@@ -12,6 +12,9 @@ on:
         description: 'Version to publish'
         required: false
 
+permissions:
+  contents: write
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
