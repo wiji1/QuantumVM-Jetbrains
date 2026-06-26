@@ -1,0 +1,19 @@
+{
+  "name": "openqasm-textmate",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.0.0"
+  },
+  "contributes": {
+    "languages": [{
+      "id": "openqasm",
+      "aliases": ["OpenQASM", "qasm"],
+      "extensions": [".qasm", ".qasm3"]
+    }],
+    "grammars": [{
+      "language": "openqasm",
+      "scopeName": "source.qasm",
+      "path": "./syntaxes/qasm.tmLanguage.json" 
+    }]
+  }
+}

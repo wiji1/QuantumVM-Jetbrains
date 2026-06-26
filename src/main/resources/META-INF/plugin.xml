@@ -1,0 +1,129 @@
+<idea-plugin>
+    <id>com.quantumvm.intellij</id>
+    <name>QuantumVM</name>
+    <vendor email="support@quantumvm.com" url="https://github.com/wiji1/QuantumVM">QuantumVM</vendor>
+
+    <description><![CDATA[
+    OpenQASM 3.0 support for JetBrains IDEs with LSP integration and runtime execution.
+    <br/><br/>
+    <b>Features:</b>
+    <ul>
+      <li>Syntax highlighting for .qasm files using TextMate grammar</li>
+      <li>Language Server Protocol (LSP) integration with auto-downloaded qasm-lsp binary</li>
+      <li>Run QASM files with QuantumVM runtime</li>
+      <li>Auto-update system for binaries from GitHub (wiji1/QuantumVM)</li>
+      <li>Configurable settings for LSP trace levels and custom binary paths</li>
+      <li>Gutter icons for quick file execution</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.redhat.devtools.lsp4ij</depends>
+    <depends>org.jetbrains.plugins.textmate</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Notifications -->
+        <notificationGroup id="QuantumVM Notifications"
+                          displayType="BALLOON"/>
+
+        <!-- Language Definition -->
+        <lang.language
+                id="qasm"
+                implementationClass="com.quantumvm.intellij.language.QasmLanguage"/>
+
+        <!-- File Type -->
+        <fileType
+                name="QASM"
+                implementationClass="com.quantumvm.intellij.language.QasmFileType"
+                fieldName="INSTANCE"
+                language="qasm"
+                extensions="qasm"/>
+
+
+        <!-- Run Configuration -->
+        <configurationType
+                implementation="com.quantumvm.intellij.runner.QasmRunConfigurationType"/>
+        <runConfigurationProducer
+                implementation="com.quantumvm.intellij.runner.QasmRunConfigurationProducer"/>
+        <runLineMarkerContributor
+                language="qasm"
+                implementationClass="com.quantumvm.intellij.runner.QasmRunLineMarkerContributor"/>
+        <programRunner
+                implementation="com.quantumvm.intellij.runner.QasmProgramRunner"/>
+
+        <!-- Settings -->
+        <applicationConfigurable
+                parentId="tools"
+                instance="com.quantumvm.intellij.settings.QasmSettingsConfigurable"
+                id="com.quantumvm.intellij.settings.QasmSettingsConfigurable"
+                displayName="OpenQASM"/>
+        <applicationService
+                serviceImplementation="com.quantumvm.intellij.settings.QasmSettingsComponent"/>
+
+        <!-- Binary Management Services -->
+        <applicationService
+                serviceImplementation="com.quantumvm.intellij.binary.BinaryManager"/>
+        <applicationService
+                serviceImplementation="com.quantumvm.intellij.binary.VersionManager"/>
+
+        <!-- Update System -->
+        <applicationService
+                serviceImplementation="com.quantumvm.intellij.update.UpdateChecker"/>
+        <postStartupActivity
+                implementation="com.quantumvm.intellij.QasmPlugin"/>
+
+        <!-- TextMate Integration -->
+        <textmate.bundleProvider
+                implementation="com.quantumvm.intellij.language.QasmTextMateBundleProvider"/>
+        <editorHighlighterProvider
+                filetype="QASM"
+                implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateEditorHighlighterProvider"/>
+        <lang.syntaxHighlighterFactory
+                language="qasm"
+                implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <!-- LSP Server Definition -->
+        <server
+                id="qasmLanguageServer"
+                name="QASM Language Server"
+                factoryClass="com.quantumvm.intellij.lsp.QasmLspServerSupportProvider">
+            <description><![CDATA[
+            Language Server Protocol support for OpenQASM 3.0 files.
+            Provides code completion, diagnostics, and other language features.
+            ]]></description>
+        </server>
+
+        <!-- Language Mapping -->
+        <languageMapping
+                language="qasm"
+                serverId="qasmLanguageServer"
+                filePattern="*.qasm"/>
+    </extensions>
+
+    <actions>
+        <!-- Tools Menu Actions -->
+        <group id="com.quantumvm.intellij.ToolsMenu"
+               text="OpenQASM"
+               description="OpenQASM tools"
+               popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="com.quantumvm.intellij.actions.CheckForUpdatesAction"
+                    class="com.quantumvm.intellij.actions.CheckForUpdatesAction"
+                    text="Check for Binary Updates"
+                    description="Check for updates to qasm-lsp and QuantumVM binaries"/>
+        </group>
+
+        <!-- Context Menu Action -->
+        <action id="com.quantumvm.intellij.actions.RunQasmFileAction"
+                class="com.quantumvm.intellij.actions.RunQasmFileAction"
+                text="Run QASM File"
+                description="Execute the current QASM file with QuantumVM"
+                icon="AllIcons.Actions.Execute">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift R"/>
+            <keyboard-shortcut keymap="Mac OS X" first-keystroke="meta shift R" replace-all="true"/>
+        </action>
+    </actions>
+</idea-plugin>
