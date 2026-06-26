@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>com.quantumvm.intellij</id>
+    <id>com.quantumvm.qasm</id>
     <name>QuantumVM</name>
     <vendor email="support@quantumvm.com" url="https://github.com/wiji1/QuantumVM">QuantumVM</vendor>
 
