@@ -39,7 +39,6 @@
                 language="qasm"
                 extensions="qasm"/>
 
-
         <!-- Run Configuration -->
         <configurationType
                 implementation="com.quantumvm.intellij.runner.QasmRunConfigurationType"/>

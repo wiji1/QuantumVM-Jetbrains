@@ -18,7 +18,7 @@ repositories {
 dependencies {
     intellijPlatform {
         create(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
-        plugin("com.redhat.devtools.lsp4ij", "0.14.2")
+        plugin("com.redhat.devtools.lsp4ij", "0.20.1")
         bundledPlugin("org.jetbrains.plugins.textmate")
         pluginVerifier()
         instrumentationTools()

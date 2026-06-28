@@ -6,12 +6,12 @@
   },
   "contributes": {
     "languages": [{
-      "id": "openqasm",
+      "id": "qasm",
       "aliases": ["OpenQASM", "qasm"],
       "extensions": [".qasm", ".qasm3"]
     }],
     "grammars": [{
-      "language": "openqasm",
+      "language": "qasm",
       "scopeName": "source.qasm",
       "path": "./syntaxes/qasm.tmLanguage.json" 
     }]
