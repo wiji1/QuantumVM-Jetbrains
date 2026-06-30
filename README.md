@@ -6,10 +6,10 @@ OpenQASM 3.0 support for JetBrains IDEs with LSP integration and runtime executi
 
 - **Syntax Highlighting** - TextMate-based syntax highlighting for `.qasm` and `.qasm3` files
 - **LSP Integration** - Language Server Protocol support via [qasm-lsp](https://github.com/wiji1/QuantumVM)
-  - Code completion
-  - Diagnostics and error checking
-  - Hover documentation
-  - Go to definition
+    - Code completion
+    - Diagnostics and error checking
+    - Hover documentation
+    - Go to definition
 - **Runtime Execution** - Run QASM files with QuantumVM runtime
 - **Auto-Updates** - Automatic binary downloads and updates from GitHub releases
 - **Configurable** - Customize LSP settings and binary paths
@@ -40,9 +40,9 @@ OpenQASM 3.0 support for JetBrains IDEs with LSP integration and runtime executi
 
 1. Open or create a `.qasm` file
 2. The plugin will automatically:
-   - Download the qasm-lsp binary (first run only)
-   - Start the language server
-   - Provide syntax highlighting and LSP features
+    - Download the qasm-lsp binary (first run only)
+    - Start the language server
+    - Provide syntax highlighting and LSP features
 
 ### Running QASM Files
 

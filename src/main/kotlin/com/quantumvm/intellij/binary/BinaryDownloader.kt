@@ -11,6 +11,8 @@ import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URI
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 
 data class GitHubRelease(
     val tagName: String,
@@ -84,11 +86,6 @@ class BinaryDownloader {
                     if (destinationFile.exists()) destinationFile.delete()
                     tmpFile.renameTo(destinationFile)
 
-                    // Set executable permissions on Unix systems
-                    if (!System.getProperty("os.name").lowercase().contains("win")) {
-                        destinationFile.setExecutable(true, false)
-                    }
-
                     indicator.text = "Download complete"
                     indicator.fraction = 1.0
 
@@ -98,6 +95,111 @@ class BinaryDownloader {
                 }
             }
         })
+    }
+
+    fun downloadAndExtractArchive(
+        url: String,
+        archiveFile: File,
+        extractDir: File,
+        title: String,
+        onComplete: (File) -> Unit,
+        onError: (Exception) -> Unit
+    ) {
+        ProgressManager.getInstance().run(object : Task.Backgroundable(null, title, false) {
+            override fun run(indicator: ProgressIndicator) {
+                try {
+                    indicator.text = "Downloading archive..."
+                    indicator.isIndeterminate = false
+
+                    val tmpFile = File(archiveFile.absolutePath + ".tmp")
+                    archiveFile.parentFile?.mkdirs()
+
+                    downloadWithRedirects(url, tmpFile, indicator, 0)
+
+                    if (archiveFile.exists()) archiveFile.delete()
+                    tmpFile.renameTo(archiveFile)
+
+                    indicator.text = "Extracting archive..."
+                    indicator.fraction = 0.0
+
+                    extractArchive(archiveFile, extractDir)
+
+                    indicator.text = "Extraction complete"
+                    indicator.fraction = 1.0
+
+                    onComplete(extractDir)
+                } catch (e: Exception) {
+                    onError(e)
+                }
+            }
+        })
+    }
+
+    private fun extractArchive(archiveFile: File, targetDir: File) {
+        targetDir.mkdirs()
+
+        when {
+            archiveFile.name.endsWith(".tar.xz") -> extractTarXz(archiveFile, targetDir)
+            archiveFile.name.endsWith(".zip") -> extractZip(archiveFile, targetDir)
+            else -> throw RuntimeException("Unsupported archive format: ${archiveFile.name}")
+        }
+    }
+
+    private fun extractTarXz(archiveFile: File, targetDir: File) {
+        val process = ProcessBuilder("tar", "-xJf", archiveFile.absolutePath)
+            .directory(targetDir)
+            .redirectErrorStream(true)
+            .start()
+
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            val errorOutput = process.inputStream.bufferedReader().readText()
+            throw RuntimeException("Failed to extract tar.xz: tar exited with code $exitCode\n$errorOutput")
+        }
+
+        // Archives produced by cargo-dist have a top-level directory named after the target triple.
+        // Move any binaries from that subdirectory up to the target directory.
+        val subDirs = targetDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
+        if (subDirs.size == 1) {
+            val subDir = subDirs.first()
+            subDir.listFiles()?.forEach { file ->
+                val dest = File(targetDir, file.name)
+                if (!dest.exists()) {
+                    file.renameTo(dest)
+                }
+            }
+            subDir.delete()
+        }
+
+        targetDir.listFiles()?.forEach { file ->
+            if (!System.getProperty("os.name").lowercase().contains("win")) {
+                file.setExecutable(true, false)
+            }
+        }
+    }
+
+    private fun extractZip(archiveFile: File, targetDir: File) {
+        ZipInputStream(archiveFile.inputStream()).use { zis ->
+            var entry: ZipEntry? = zis.nextEntry
+            while (entry != null) {
+                val outputFile = File(targetDir, entry.name)
+
+                if (entry.isDirectory) {
+                    outputFile.mkdirs()
+                } else {
+                    outputFile.parentFile?.mkdirs()
+                    FileOutputStream(outputFile).use { fos ->
+                        zis.copyTo(fos)
+                    }
+                    if (!System.getProperty("os.name").lowercase().contains("win")) {
+                        outputFile.setExecutable(true, false)
+                    }
+                }
+
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
     }
 
     private fun downloadWithRedirects(

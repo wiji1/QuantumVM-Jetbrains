@@ -84,22 +84,7 @@ class UpdateChecker {
             NotificationType.INFORMATION
         )
 
-        var lspComplete = false
-        var vmComplete = false
-
-        binaryManager.ensureLspBinary(forceDownload = true) {
-            lspComplete = true
-            checkUpdateComplete(lspComplete, vmComplete, version)
-        }
-
-        binaryManager.ensureVmBinary(forceDownload = true) {
-            vmComplete = true
-            checkUpdateComplete(lspComplete, vmComplete, version)
-        }
-    }
-
-    private fun checkUpdateComplete(lspComplete: Boolean, vmComplete: Boolean, version: String) {
-        if (lspComplete && vmComplete) {
+        binaryManager.ensureBinaries(forceDownload = true) {
             versionManager.updateVersions(version, version)
             showNotification(
                 "Update Complete",

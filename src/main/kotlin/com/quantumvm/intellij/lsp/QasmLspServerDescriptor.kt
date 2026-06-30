@@ -51,7 +51,20 @@ class QasmStreamConnectionProvider(private val project: Project) : StreamConnect
                 serverPath = binaryPath.toString()
             } else {
                 binaryManager.ensureLspBinary(forceDownload = false)
-                throw RuntimeException("QASM Language Server binary is being downloaded. Please wait and try again.")
+                repeat(60) {
+                    val path = binaryManager.getLspBinaryPath()
+                    if (path != null) {
+                        serverPath = path.toString()
+                        return@repeat
+                    }
+                    Thread.sleep(1000)
+                }
+                if (serverPath == null) {
+                    throw RuntimeException(
+                        "Failed to download QASM Language Server binary. " +
+                        "Check your internet connection and ensure the binary is not blocked."
+                    )
+                }
             }
         }
 

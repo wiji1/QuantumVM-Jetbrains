@@ -6,7 +6,8 @@ import com.intellij.openapi.components.Service
 import java.io.File
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Service(Service.Level.APP)
 class BinaryManager {
@@ -18,7 +19,9 @@ class BinaryManager {
 
     private val downloader = BinaryDownloader()
     private val platformInfo = PlatformDetector.detectPlatform()
-    private val downloadLocks = ConcurrentHashMap<String, Boolean>()
+    private val extractionLock = AtomicBoolean(false)
+    private val extractionDone = AtomicBoolean(false)
+    private val pendingCallbacks = CopyOnWriteArrayList<() -> Unit>()
 
     private fun getStorageDir(): File {
         val pluginsPath = PathManager.getPluginsPath()
@@ -30,16 +33,28 @@ class BinaryManager {
     }
 
     private fun getBinaryPath(binaryBaseName: String): Path {
-        val binaryName = platformInfo.getBinaryName(binaryBaseName)
+        val binaryName = "$binaryBaseName${platformInfo.getBinaryExtension()}"
         return Paths.get(getStorageDir().absolutePath, binaryName)
     }
 
     fun ensureLspBinary(forceDownload: Boolean = false, onComplete: ((Path) -> Unit)? = null) {
-        ensureBinary(LSP_BINARY_NAME, "QASM Language Server", forceDownload, onComplete)
+        ensureBinariesInternal(forceDownload) {
+            val path = getBinaryPath(LSP_BINARY_NAME)
+            onComplete?.invoke(path)
+        }
     }
 
     fun ensureVmBinary(forceDownload: Boolean = false, onComplete: ((Path) -> Unit)? = null) {
-        ensureBinary(VM_BINARY_NAME, "QuantumVM", forceDownload, onComplete)
+        ensureBinariesInternal(forceDownload) {
+            val path = getBinaryPath(VM_BINARY_NAME)
+            onComplete?.invoke(path)
+        }
+    }
+
+    fun ensureBinaries(forceDownload: Boolean = false, onComplete: (() -> Unit)? = null) {
+        ensureBinariesInternal(forceDownload) {
+            onComplete?.invoke()
+        }
     }
 
     fun getLspBinaryPath(): Path? {
@@ -52,65 +67,88 @@ class BinaryManager {
         return if (path.toFile().exists()) path else null
     }
 
-    private fun ensureBinary(
-        binaryBaseName: String,
-        title: String,
-        forceDownload: Boolean,
-        onComplete: ((Path) -> Unit)?
-    ) {
-        val binaryPath = getBinaryPath(binaryBaseName)
-        val binaryFile = binaryPath.toFile()
-
-        if (binaryFile.exists() && !forceDownload) {
-            if (!System.getProperty("os.name").lowercase().contains("win")) binaryFile.setExecutable(true, false)
-            onComplete?.invoke(binaryPath)
+    private fun ensureBinariesInternal(forceDownload: Boolean, onComplete: () -> Unit) {
+        if (!forceDownload && extractionDone.get()) {
+            setExecutableOnBinaries()
+            onComplete()
             return
         }
 
-        val lockKey = "$binaryBaseName-$forceDownload"
-        if (downloadLocks.putIfAbsent(lockKey, true) != null) return
+        if (!extractionLock.compareAndSet(false, true)) {
+            pendingCallbacks.add(onComplete)
+            return
+        }
 
         try {
-            val release = downloader.fetchLatestRelease()
-            val assetName = platformInfo.getBinaryName(binaryBaseName)
-            val asset = downloader.findAsset(release, assetName)
+            val lspPath = getBinaryPath(LSP_BINARY_NAME)
+            val vmPath = getBinaryPath(VM_BINARY_NAME)
 
-            if (asset == null) {
-                val errorMsg = "No binary found for ${platformInfo.platform}-${platformInfo.architecture}"
-                downloader.showNotification("Binary Download Failed", errorMsg, NotificationType.ERROR)
-                downloadLocks.remove(lockKey)
+            if (!forceDownload && lspPath.toFile().exists() && vmPath.toFile().exists()) {
+                extractionDone.set(true)
+                setExecutableOnBinaries()
+                firePendingCallbacks()
+                onComplete()
                 return
             }
 
-            downloader.downloadBinary(
+            pendingCallbacks.add(onComplete)
+
+            val release = downloader.fetchLatestRelease()
+            val assetName = platformInfo.getArchiveAssetName()
+            val asset = downloader.findAsset(release, assetName)
+
+            if (asset == null) {
+                val errorMsg = "No archive found for ${platformInfo.triple}"
+                downloader.showNotification("Binary Download Failed", errorMsg, NotificationType.ERROR)
+                return
+            }
+
+            val storageDir = getStorageDir()
+            val archiveFile = File(storageDir, assetName)
+
+            downloader.downloadAndExtractArchive(
                 url = asset.browserDownloadUrl,
-                destinationFile = binaryFile,
-                title = "Downloading $title",
-                onComplete = { file ->
-                    downloadLocks.remove(lockKey)
+                archiveFile = archiveFile,
+                extractDir = storageDir,
+                title = "Downloading QuantumVM binaries",
+                onComplete = {
+                    extractionDone.set(true)
+                    setExecutableOnBinaries()
                     downloader.showNotification(
                         "Download Complete",
-                        "$title has been downloaded successfully",
+                        "QuantumVM and qasm-lsp have been downloaded successfully",
                         NotificationType.INFORMATION
                     )
-                    onComplete?.invoke(file.toPath())
+                    firePendingCallbacks()
                 },
                 onError = { error ->
-                    downloadLocks.remove(lockKey)
+                    pendingCallbacks.clear()
                     downloader.showNotification(
                         "Download Failed",
-                        "Failed to download $title: ${error.message}",
+                        "Failed to download binaries: ${error.message}",
                         NotificationType.ERROR
                     )
                 }
             )
         } catch (e: Exception) {
-            downloadLocks.remove(lockKey)
+            pendingCallbacks.clear()
             downloader.showNotification(
                 "Download Failed",
-                "Failed to download $title: ${e.message}",
+                "Failed to download binaries: ${e.message}",
                 NotificationType.ERROR
             )
         }
+    }
+
+    private fun firePendingCallbacks() {
+        val callbacks = pendingCallbacks.toList()
+        pendingCallbacks.clear()
+        callbacks.forEach { it() }
+    }
+
+    private fun setExecutableOnBinaries() {
+        if (System.getProperty("os.name").lowercase().contains("win")) return
+        getBinaryPath(LSP_BINARY_NAME).toFile().setExecutable(true, false)
+        getBinaryPath(VM_BINARY_NAME).toFile().setExecutable(true, false)
     }
 }

@@ -89,14 +89,29 @@ class QasmCommandLineState(
         var vmPath: String? = settings.state.vmBinaryPath
         if (vmPath.isNullOrEmpty()) {
             val binaryPath = binaryManager.getVmBinaryPath()
-            if (binaryPath != null) vmPath = binaryPath.toString()
-            else {
+            if (binaryPath != null) {
+                vmPath = binaryPath.toString()
+            } else {
                 binaryManager.ensureVmBinary(forceDownload = false)
-                throw RuntimeException("QuantumVM binary is being downloaded. Please wait and try again.")
+                repeat(60) {
+                    val path = binaryManager.getVmBinaryPath()
+                    if (path != null) {
+                        vmPath = path.toString()
+                        return@repeat
+                    }
+                    Thread.sleep(1000)
+                }
+                if (vmPath == null) {
+                    throw RuntimeException(
+                        "Failed to download QuantumVM binary. " +
+                        "Check your internet connection and ensure the binary is not blocked."
+                    )
+                }
             }
         }
 
-        if (!File(vmPath).exists()) throw RuntimeException("QuantumVM binary not found at: $vmPath")
+        val resolvedVmPath = vmPath ?: error("QuantumVM binary path not resolved")
+        if (!File(resolvedVmPath).exists()) throw RuntimeException("QuantumVM binary not found at: $resolvedVmPath")
 
         val scriptPath = config.scriptPath
         if (scriptPath.isEmpty()) throw RuntimeException("No QASM file specified")
@@ -104,7 +119,7 @@ class QasmCommandLineState(
         if (!File(scriptPath).exists()) throw RuntimeException("QASM file not found: $scriptPath")
 
         val commandLine = GeneralCommandLine()
-            .withExePath(vmPath)
+            .withExePath(resolvedVmPath)
             .withParameters(scriptPath)
             .withWorkDirectory(config.project.basePath ?: System.getProperty("user.dir"))
 
